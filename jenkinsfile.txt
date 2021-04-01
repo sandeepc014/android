@@ -1,0 +1,30 @@
+#!groovy
+pipeline {
+  agent any
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '3'))
+    disableConcurrentBuilds()
+  }
+  stages {
+    stage('Fetch dependencies & Compile') {
+      steps {
+        sh 'export LLVM_PATH=/home/ubuntu/Android/Sdk/ndk/21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/bin'
+        sh './gradlew clean buildRelease lintRelease -Pdisable-performance-plugin'
+      }
+    }
+    stage('SonarQube analysis') {
+      steps {
+        withSonarQubeEnv('SonarQube') {
+          sh 'sonar-scanner'
+        }
+      }
+    }
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 15, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+  }
+}
